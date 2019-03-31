@@ -1,4 +1,6 @@
 push = require 'push'
+Class = require 'class'
+require 'Bird'
 
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 720
@@ -12,10 +14,12 @@ local backgroundScroll = 0
 local ground = love.graphics.newImage('assets/ground.png')
 local groundScroll = 0
 
-local BACKGROUND_SCROLL_SPEED = 20
+local BACKGROUND_SCROLL_SPEED = 10
 local GROUND_SCROLL_SPEED = 60
 
 local BACKGROUND_LOOPING_POINT = 413
+
+local bird = Bird()
 
 function love.load()
     love.graphics.setDefaultFilter('nearest', 'nearest')
@@ -27,6 +31,8 @@ function love.load()
         fullscreen=false,
         resizeable=true
     })
+
+    love.keyboard.keysPressed = {}
 end
 
 function love.update(dt)
@@ -35,6 +41,10 @@ function love.update(dt)
 
     groundScroll = (groundScroll + GROUND_SCROLL_SPEED * dt)
         % VIRTUAL_WIDTH
+
+    bird:update(dt)
+
+    love.keyboard.keysPressed = {}
 end
 
 function love.resize(w, h)
@@ -42,8 +52,18 @@ function love.resize(w, h)
 end
 
 function love.keypressed(key)
+    love.keyboard.keysPressed[key] = true
+    
     if key =='escape' then
         love.event.quit()
+    end
+end
+
+function love.keyboard.wasPressed(key)
+    if love.keyboard.keysPressed then
+        return true
+    else
+        return false
     end
 end
 
@@ -51,5 +71,18 @@ function love.draw()
     push:start()
     love.graphics.draw(background, -backgroundScroll, 0)
     love.graphics.draw(ground, -groundScroll, VIRTUAL_HEIGHT-16)
+    displayFPS()
+
+    bird:render()
+
     push:finish()
+end
+
+function displayFPS()
+    --smallFont = love.graphics.newFont('font.ttf', 8)
+    -- simple FPS display across all states
+    --love.graphics.setFont(smallFont)
+    love.graphics.setColor(0, 255, 0, 255)
+    love.graphics.print('FPS: ' .. tostring(love.timer.getFPS()), 10, 10)
+    love.graphics.setColor(255, 255, 255, 255)
 end
