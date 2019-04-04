@@ -50,6 +50,7 @@ function Bird:update(dt)
 
     -- add a sudden burst of negative gravity if we hit space
     if love.keyboard.wasPressed('space') then
+        sounds['jump']:play()
         self.dy = -5*(60/450)
     end
 
