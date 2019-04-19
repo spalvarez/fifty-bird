@@ -9,14 +9,20 @@
 ]]
 
 Bird = Class{}
+local anim8 = require 'anim8'
 
 local GRAVITY = 20*(60/400)
+local flyingImage, animation
 
 function Bird:init()
     -- load bird image from disk and assign its width and height
     self.image = love.graphics.newImage('assets/bird.png')
     self.width = self.image:getWidth()
     self.height = self.image:getHeight()
+
+    flyingImage = love.graphics.newImage('assets/animatedbird.png')
+    local g = anim8.newGrid(self.width, self.height, flyingImage:getWidth(), flyingImage:getHeight())
+    animation = anim8.newAnimation(g('1-6',1), 0.01)
 
     -- position bird in the middle of the screen
     self.x = VIRTUAL_WIDTH / 2 - (self.width / 2)
@@ -47,6 +53,7 @@ end
 function Bird:update(dt)
     -- apply gravity to velocity
     self.dy = self.dy + GRAVITY * dt
+    
 
     -- add a sudden burst of negative gravity if we hit space
     if love.keyboard.wasPressed('space') or love.mouse.wasPressed(1) then
@@ -56,8 +63,15 @@ function Bird:update(dt)
 
     -- apply current velocity to Y position
     self.y = self.y + self.dy
+    if(self.dy < 0) then
+        animation:update(dt)
+    end
 end
 
 function Bird:render()
-    love.graphics.draw(self.image, self.x, self.y)
+    if(self.dy > 0) then
+        love.graphics.draw(self.image, self.x, self.y)
+    else
+        animation:draw(flyingImage, self.x, self.y)
+    end
 end

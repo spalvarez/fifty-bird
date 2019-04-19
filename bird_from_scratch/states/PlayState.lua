@@ -13,6 +13,7 @@ PlayState = Class{__includes = BaseState}
 PIPE_SPEED = 60
 PIPE_WIDTH = 70
 PIPE_HEIGHT = 288
+PAUSE_ICON = love.graphics.newImage('assets/pause_icon.png')
 
 BIRD_WIDTH = 38
 BIRD_HEIGHT = 24
@@ -21,6 +22,7 @@ function PlayState:init()
     self.bird = Bird()
     self.pipePairs = {}
     self.timer = 0
+    self.paused = 0
 
     -- now keep track of our score
     self.score = 0
@@ -30,78 +32,95 @@ function PlayState:init()
 end
 
 function PlayState:update(dt)
-    -- local number to set the time span between pipes at 1-3 seconds
-    local pipeSpan = love.math.random() * 2 + 1.85
-    -- update timer for pipe spawning
-    self.timer = self.timer + dt
-
-    -- spawn a new pipe pair every second and a half
-    if self.timer > pipeSpan then
-        -- modify the last Y coordinate we placed so pipe gaps aren't too far apart
-        -- no higher than 10 pixels below the top edge of the screen,
-        -- and no lower than a gap length (90 pixels) from the bottom
-        local y = math.max(-PIPE_HEIGHT + love.math.random(10), 
-            math.min(self.lastY + math.random(-40, 40), VIRTUAL_HEIGHT - 90 - PIPE_HEIGHT))
-        self.lastY = y
-
-        -- add a new pipe pair at the end of the screen at our new Y
-        table.insert(self.pipePairs, PipePair(y))
-
-        -- reset timer
-        self.timer = 0
+    --respond to the p key to pause the game
+    if love.keyboard.wasPressed('p') then
+        if self.paused == 0 then 
+            self.paused = 1
+            scrolling = false
+            sounds['music']:stop()
+            sounds['pause']:play()
+        else
+            self.paused = 0
+            scrolling = true
+            sounds['music']:play()
+            sounds['pause']:play()
+        end
     end
 
-    -- for every pair of pipes..
-    for k, pair in pairs(self.pipePairs) do
-        -- score a point if the pipe has gone past the bird to the left all the way
-        -- be sure to ignore it if it's already been scored
-        if not pair.scored then
-            if pair.x + PIPE_WIDTH < self.bird.x then
-                self.score = self.score + 1
-                pair.scored = true
-                sounds['score']:play()
+    if self.paused == 0 then
+        -- local number to set the time span between pipes at 1-3 seconds
+        local pipeSpan = love.math.random() * 2 + 1.85
+        -- update timer for pipe spawning
+        self.timer = self.timer + dt
+
+        -- spawn a new pipe pair every second and a half
+        if self.timer > pipeSpan then
+            -- modify the last Y coordinate we placed so pipe gaps aren't too far apart
+            -- no higher than 10 pixels below the top edge of the screen,
+            -- and no lower than a gap length (90 pixels) from the bottom
+            local y = math.max(-PIPE_HEIGHT + love.math.random(10), 
+                math.min(self.lastY + math.random(-40, 40), VIRTUAL_HEIGHT - 90 - PIPE_HEIGHT))
+            self.lastY = y
+
+            -- add a new pipe pair at the end of the screen at our new Y
+            table.insert(self.pipePairs, PipePair(y))
+
+            -- reset timer
+            self.timer = 0
+        end
+
+        -- for every pair of pipes..
+        for k, pair in pairs(self.pipePairs) do
+            -- score a point if the pipe has gone past the bird to the left all the way
+            -- be sure to ignore it if it's already been scored
+            if not pair.scored then
+                if pair.x + PIPE_WIDTH < self.bird.x then
+                    self.score = self.score + 1
+                    pair.scored = true
+                    sounds['score']:play()
+                end
+            end
+
+            -- update position of pair
+            pair:update(dt)
+        end
+
+        -- we need this second loop, rather than deleting in the previous loop, because
+        -- modifying the table in-place without explicit keys will result in skipping the
+        -- next pipe, since all implicit keys (numerical indices) are automatically shifted
+        -- down after a table removal
+        for k, pair in pairs(self.pipePairs) do
+            if pair.remove then
+                table.remove(self.pipePairs, k)
             end
         end
 
-        -- update position of pair
-        pair:update(dt)
-    end
+        -- update bird based on gravity and input
+        self.bird:update(dt)
 
-    -- we need this second loop, rather than deleting in the previous loop, because
-    -- modifying the table in-place without explicit keys will result in skipping the
-    -- next pipe, since all implicit keys (numerical indices) are automatically shifted
-    -- down after a table removal
-    for k, pair in pairs(self.pipePairs) do
-        if pair.remove then
-            table.remove(self.pipePairs, k)
-        end
-    end
+        -- simple collision between bird and all pipes in pairs
+        for k, pair in pairs(self.pipePairs) do
+            for l, pipe in pairs(pair.pipes) do
+                if self.bird:collides(pipe) then
+                    sounds['explosion']:play()
+                    sounds['hurt']:play()
 
-    -- update bird based on gravity and input
-    self.bird:update(dt)
-
-    -- simple collision between bird and all pipes in pairs
-    for k, pair in pairs(self.pipePairs) do
-        for l, pipe in pairs(pair.pipes) do
-            if self.bird:collides(pipe) then
-                sounds['explosion']:play()
-                sounds['hurt']:play()
-
-                gStateMachine:change('score', {
-                    score = self.score
-                })
+                    gStateMachine:change('score', {
+                        score = self.score
+                    })
+                end
             end
         end
-    end
 
-    -- reset if we get to the ground
-    if self.bird.y > VIRTUAL_HEIGHT - 15 then
-        sounds['explosion']:play()
-        sounds['hurt']:play()
-        
-        gStateMachine:change('score', {
-            score = self.score
-        })
+        -- reset if we get to the ground
+        if self.bird.y > VIRTUAL_HEIGHT - 15 then
+            sounds['explosion']:play()
+            sounds['hurt']:play()
+            
+            gStateMachine:change('score', {
+                score = self.score
+            })
+        end
     end
 end
 
@@ -114,4 +133,8 @@ function PlayState:render()
     love.graphics.print('Score: ' .. tostring(self.score), 8, 8)
 
     self.bird:render()
+
+    if self.paused == 1 then
+        love.graphics.draw(PAUSE_ICON, VIRTUAL_WIDTH/2-16, VIRTUAL_HEIGHT/2-16)
+    end
 end
